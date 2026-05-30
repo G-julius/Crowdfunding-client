@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom';
 
 import CustomButton from './CustomButton';
@@ -12,8 +12,6 @@ const Navbar = () => {
     const [isActive, setIsActive] = useState('dashboard');
     const [toggleDrawer, setToggleDrawer] = useState(false);
     const { address, connect } = useStateContext()
-
-    // const address = '0jfsffn'
 
     return (
         <div className="flex md:flex-row flex-col-reverse justify-between mb-[35px] gap-6">

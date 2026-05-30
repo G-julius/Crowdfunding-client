@@ -1,132 +1,178 @@
-import { useContext, createContext, FC, ReactNode } from 'react';
-
-import { useAddress, useContract, useMetamask, useContractWrite } from '@thirdweb-dev/react';
-// import { ThirdwebSDK } from "@thirdweb-dev/sdk/evm";
+import { createContext, useContext, FC, ReactNode, useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
+import contractABI from '../contract/abi.json';
+
+const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+
+interface Campaign {
+  owner: string;
+  title: string;
+  description: string;
+  target: string;
+  deadline: number;
+  amountCollected: string;
+  image: string;
+  donors: string[];
+  donations: string[];
+  pId: number;
+}
 
 interface StateInterface {
-    address: string,
-    contract: object,
-    connect: () => void,
-    createCampaign: any,
-    getCampaigns: () => void,
-    getUserCampaigns: () => void,
-    donate: any,
-    getDonations: any
+  address: string;
+  contract: ethers.Contract | null;
+  connect: () => Promise<void>;
+  createCampaign: (form: any) => Promise<void>;
+  getCampaigns: () => Promise<Campaign[]>;
+  getUserCampaigns: () => Promise<Campaign[]>;
+  donate: (pId: number, amount: string) => Promise<void>;
+  getDonations: (pId: number) => Promise<{ donator: string; donation: string }[]>;
 }
 
 export const StateContext = createContext<StateInterface>({
-    address: "",
-    contract: {},
-    connect: () => {},
-    createCampaign: () => {},
-    getCampaigns: () => {},
-    getUserCampaigns: () => {},
-    donate: () => {},
-    getDonations: () => {}
+  address: '',
+  contract: null,
+  connect: async () => {},
+  createCampaign: async () => {},
+  getCampaigns: async () => [],
+  getUserCampaigns: async () => [],
+  donate: async () => {},
+  getDonations: async () => [],
 });
 
 interface stateProps {
-    children: ReactNode;
+  children: ReactNode;
 }
 
-export const StateContextProvider : FC<stateProps> = ({ children }) => {
+export const StateContextProvider: FC<stateProps> = ({ children }) => {
+  const [address, setAddress] = useState<string>('');
+  const [contract, setContract] = useState<ethers.Contract | null>(null);
 
-    const con = useContract('0x86524A3f7f22E72924B69ff5e8E0a08746f82d4D');
-    const { contract, isLoading } : any = useContract('0x86524A3f7f22E72924B69ff5e8E0a08746f82d4D');
+  const getContract = useCallback((signerOrProvider: ethers.Signer | ethers.providers.Provider) => {
+    return new ethers.Contract(CONTRACT_ADDRESS, contractABI, signerOrProvider);
+  }, []);
 
-    console.log(con)
-
-    const { mutateAsync: createCampaign } = useContractWrite(contract, 'createCampaign');
-
-    // const result = await contract.methods.myFunction().call();
-
-    const address = useAddress() as string;
-    const connect = useMetamask();
-
-    const publishCampaign = async (form: { title: unknown | ethers.CallOverrides; description: unknown | ethers.CallOverrides; target: unknown | ethers.CallOverrides; deadline: string | number | Date; image: unknown | ethers.CallOverrides; }) => {
-        try {
-            const data = await createCampaign([
-                address, // owner
-                form.title, // title
-                form.description, // description
-                form.target,
-                new Date(form.deadline).getTime(), // deadline,
-                form.image
-            ])
-
-            console.log("contract call success", data)
-        } catch (error) {
-            console.log("contract call failure", error)
-        }
+  const connect = useCallback(async () => {
+    if (!window.ethereum) {
+      alert('Please install MetaMask!');
+      return;
     }
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    await provider.send('eth_requestAccounts', []);
+    const signer = provider.getSigner();
+    const addr = await signer.getAddress();
+    setAddress(addr);
+    setContract(getContract(signer));
+  }, [getContract]);
 
-    const getCampaigns = async () => {
-
-        const campaigns = await contract.call('getCampaigns');
-
-        const parsedCampaings = campaigns.map((campaign: { owner: any; title: any; description: any; target: { toString: () => ethers.BigNumberish; }; deadline: { toNumber: () => any; }; amountCollected: { toString: () => ethers.BigNumberish; }; image: any; }, i: any) => ({
-            owner: campaign.owner,
-            title: campaign.title,
-            description: campaign.description,
-            target: ethers.utils.formatEther(campaign.target.toString()),
-            deadline: campaign.deadline.toNumber(),
-            amountCollected: ethers.utils.formatEther(campaign.amountCollected.toString()),
-            image: campaign.image,
-            pId: i
-        }));
-
-        console.log(parsedCampaings)
-        return parsedCampaings;
+  const checkConnection = useCallback(async () => {
+    if (!window.ethereum) return;
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const accounts = await provider.listAccounts();
+    if (accounts.length > 0) {
+      const signer = provider.getSigner();
+      const addr = await signer.getAddress();
+      setAddress(addr);
+      setContract(getContract(signer));
     }
+  }, [getContract]);
 
-    const getUserCampaigns = async () => {
-        const allCampaigns = await getCampaigns();
+  useEffect(() => {
+    checkConnection();
+  }, [checkConnection]);
 
-        const filteredCampaigns = allCampaigns.filter((campaign: { owner: string | undefined; }) => campaign.owner === address);
+  useEffect(() => {
+    if (!window.ethereum) return;
+    const handleAccountsChanged = (accounts: string[]) => {
+      if (accounts.length === 0) {
+        setAddress('');
+        setContract(null);
+      } else {
+        checkConnection();
+      }
+    };
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+    return () => {
+      window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
+    };
+  }, [checkConnection]);
 
-        return filteredCampaigns;
+  const createCampaign = async (form: {
+    title: string;
+    description: string;
+    target: ethers.BigNumber;
+    deadline: string;
+    image: string;
+  }) => {
+    if (!contract) return;
+    try {
+      const tx = await contract.createCampaign(
+        form.title,
+        form.description,
+        form.target,
+        new Date(form.deadline).getTime(),
+        form.image
+      );
+      await tx.wait();
+    } catch (error) {
+      console.log('contract call failure', error);
     }
+  };
 
-    const donate = async (pId: unknown | ethers.CallOverrides, amount: string) => {
-        const data = await contract.call('donateToCampaign', pId, { value: ethers.utils.parseEther(amount) });
+  const getCampaigns = async (): Promise<Campaign[]> => {
+    if (!contract) return [];
+    const campaigns = await contract.getCampaigns();
+    return campaigns.map((campaign: any, i: number) => ({
+      owner: campaign.owner,
+      title: campaign.title,
+      description: campaign.description,
+      target: ethers.utils.formatEther(campaign.target.toString()),
+      deadline: campaign.deadline.toNumber(),
+      amountCollected: ethers.utils.formatEther(campaign.collectedAmount.toString()),
+      image: campaign.image,
+      donors: campaign.donors,
+      donations: campaign.donations.map((d: ethers.BigNumber) => d.toString()),
+      pId: i,
+    }));
+  };
 
-        return data;
-    }
+  const getUserCampaigns = async (): Promise<Campaign[]> => {
+    const allCampaigns = await getCampaigns();
+    return allCampaigns.filter((campaign) => campaign.owner === address);
+  };
 
-    const getDonations = async (pId: unknown | ethers.CallOverrides) => {
-        const donations = await contract.call('getDonators', pId);
-        const numberOfDonations = donations[0].length;
+  const donate = async (pId: number, amount: string) => {
+    if (!contract) return;
+    const tx = await contract.donateToCampaign(pId, {
+      value: ethers.utils.parseEther(amount),
+    });
+    await tx.wait();
+  };
 
-        const parsedDonations = [];
+  const getDonations = async (pId: number) => {
+    if (!contract) return [];
+    const [donors, donations] = await contract.getDonors(pId);
+    return donors.map((donator: string, i: number) => ({
+      donator,
+      donation: ethers.utils.formatEther(donations[i].toString()),
+    }));
+  };
 
-        for (let i = 0; i < numberOfDonations; i++) {
-            parsedDonations.push({
-                donator: donations[0][i],
-                donation: ethers.utils.formatEther(donations[1][i].toString())
-            })
-        }
-
-        return parsedDonations;
-    }
-
-
-    return (
-        <StateContext.Provider
-            value={{
-                address,
-                contract,
-                connect,
-                createCampaign: publishCampaign,
-                getCampaigns,
-                getUserCampaigns,
-                donate,
-                getDonations
-            }}
-        >
-            {children}
-        </StateContext.Provider>
-    )
-}
+  return (
+    <StateContext.Provider
+      value={{
+        address,
+        contract,
+        connect,
+        createCampaign,
+        getCampaigns,
+        getUserCampaigns,
+        donate,
+        getDonations,
+      }}
+    >
+      {children}
+    </StateContext.Provider>
+  );
+};
 
 export const useStateContext = () => useContext(StateContext);

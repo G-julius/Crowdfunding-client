@@ -4,23 +4,14 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "deploy": "yarn build && npx thirdweb@latest upload dist"
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
-    "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
-    "@thirdweb-dev/react": "^3.9.0",
-    "@thirdweb-dev/sdk": "^3.9.0",
-    "buffer": "^6.0.3",
     "ethers": "^5.7.2",
-    "events": "^3.3.0",
-    "process": "^0.11.10",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.9.0",
-    "util": "^0.12.5"
+    "react-router-dom": "^6.9.0"
   },
   "devDependencies": {
     "@types/react": "^18.0.9",

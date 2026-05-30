@@ -1,12 +1,25 @@
 /// <reference types="vite/client" />
 
+declare module '*.svg' {
+  const content: any;
+  export default content;
+}
 
-// declare module "*.png";
-// declare module "*.svg";
-// declare module "*.jpeg";
-// declare module "*.jpg";
-declare module "*pages";
-declare module "*assets";
-declare module "*constants";
-declare module "*utils";
-declare module "*components";
+declare module '*.png' {
+  const content: any;
+  export default content;
+}
+
+declare module '*.jpg' {
+  const content: any;
+  export default content;
+}
+
+declare module '*.jpeg' {
+  const content: any;
+  export default content;
+}
+
+interface Window {
+  ethereum?: any;
+}

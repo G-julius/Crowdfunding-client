@@ -1,13 +1,8 @@
-import { useState } from 'react'
 import { Route, Routes } from 'react-router-dom'
-// import Home from './pages/Home'
-// import Profile from './pages/Profile'
-import CreateCampaign from './pages/CreateCampaign'
-// import CampaignDetails from './pages/CampaignDetails'
 import { CampaignDetails, Profile, Home } from './pages'
+import CreateCampaign from './pages/CreateCampaign'
 import Sidebar from './components/Sidebar'
 import Navbar from './components/Navbar'
-
 
 function App() {
 
